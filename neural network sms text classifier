@@ -1,0 +1,56 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout
+
+# Load dataset
+url = "https://raw.githubusercontent.com/justmarkham/pycon-2016-tutorial/master/data/sms.tsv"
+data = pd.read_csv(url, sep='\t', header=None, names=['label', 'message'])
+
+# Encode labels
+data['label'] = data['label'].map({'ham': 0, 'spam': 1})
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(data['message'], data['label'], test_size=0.2, random_state=42)
+
+# Text tokenization
+tokenizer = Tokenizer(num_words=5000, oov_token='<OOV>')
+tokenizer.fit_on_texts(X_train)
+X_train_seq = tokenizer.texts_to_sequences(X_train)
+X_test_seq = tokenizer.texts_to_sequences(X_test)
+
+# Padding sequences
+max_length = 100
+X_train_padded = pad_sequences(X_train_seq, maxlen=max_length, padding='post')
+X_test_padded = pad_sequences(X_test_seq, maxlen=max_length, padding='post')
+
+# Model architecture
+model = Sequential([
+    Embedding(input_dim=5000, output_dim=64, input_length=max_length),
+    LSTM(64, return_sequences=True),
+    Dropout(0.2),
+    LSTM(32),
+    Dense(1, activation='sigmoid')
+])
+
+# Compile model
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# Train model
+model.fit(X_train_padded, y_train, epochs=5, batch_size=32, validation_split=0.2)
+
+# Evaluate model
+loss, accuracy = model.evaluate(X_test_padded, y_test)
+print(f"Test Accuracy: {accuracy:.2f}")
+
+# Test with a custom SMS
+def classify_sms(text):
+    seq = tokenizer.texts_to_sequences([text])
+    padded = pad_sequences(seq, maxlen=max_length, padding='post')
+    prediction = model.predict(padded)[0][0]
+    return "Spam" if prediction > 0.5 else "Ham"
+
+# Example usage
+print(classify_sms("Congratulations! You've won a $1,000 Walmart gift card. Call now!"))
