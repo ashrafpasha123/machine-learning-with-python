@@ -1,0 +1,22 @@
+import pandas as pd
+from scipy.sparse import csr_matrix
+from sklearn.neighbors import NearestNeighbors
+
+# Load dataset
+ratings = pd.read_csv('BX-Book-Ratings.csv', sep=';', encoding='ISO-8859-1')
+books = pd.read_csv('BX-Books.csv', sep=';', encoding='ISO-8859-1')
+
+# Create user-item matrix
+user_book_matrix = ratings.pivot(index='Book-Title', columns='User-ID', values='Book-Rating').fillna(0)
+sparse_matrix = csr_matrix(user_book_matrix)
+
+# Fit KNN model
+knn = NearestNeighbors(metric='cosine', algorithm='brute')
+knn.fit(sparse_matrix)
+
+# Find recommendations
+book_id = 0  # Example book index
+distances, indices = knn.kneighbors(sparse_matrix[book_id], n_neighbors=6)
+print("Recommendations for:", user_book_matrix.index[book_id])
+for i in range(1, len(distances.flatten())):
+    print(f"{i}: {user_book_matrix.index[indices.flatten()[i]]}")
